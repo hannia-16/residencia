@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"
     DATABASE_URL: str = "sqlite+aiosqlite:///./cosa.db"
     SQL_ECHO: bool = False
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     @property
     def show_docs(self) -> bool:

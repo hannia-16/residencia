@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from src.config import settings
 from src.models import Base
 
-MODEL_MODULES = ("src.auth.models",)
+MODEL_MODULES = ("src.auth.models", "src.sessions.models")
 
 for _module in MODEL_MODULES:
     __import__(_module)

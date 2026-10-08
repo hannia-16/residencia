@@ -27,7 +27,8 @@ class Repository(Generic[ModelT]):
         return await self.session.scalar(statement)
 
     async def exists(self, **filters: Any) -> bool:
-        statement = select(self.model.id).filter_by(**filters).limit(1)
+        primary_key = self.model.__mapper__.primary_key[0]
+        statement = select(primary_key).filter_by(**filters).limit(1)
         return await self.session.scalar(statement) is not None
 
     async def list(

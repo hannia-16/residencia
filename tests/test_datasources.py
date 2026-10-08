@@ -8,9 +8,9 @@ from src.health.exceptions import DatabaseUnavailable
 from src.main import app
 
 
-def test_user_datasource_is_registered() -> None:
+def test_datasources_are_registered() -> None:
     assert "user" in registry
-    assert registry.names() == ["user"]
+    assert registry.names() == ["metrica", "retroalimentacion", "sesion", "user"]
 
 
 def test_registry_rejects_duplicate_registration() -> None:
@@ -29,7 +29,7 @@ def test_registry_lookups_are_idempotent() -> None:
     register_datasources()
     register_datasources()
 
-    assert registry.names() == ["user"]
+    assert registry.names() == ["metrica", "retroalimentacion", "sesion", "user"]
 
 
 async def test_repository_crud_round_trip(session: AsyncSession) -> None:

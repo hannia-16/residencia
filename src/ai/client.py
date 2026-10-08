@@ -60,6 +60,7 @@ class DeepSeekClient:
         reasoning_effort: ReasoningEffort | None,
         temperature: float | None,
         max_tokens: int | None,
+        response_format: dict[str, Any] | None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": (model or self.config.MODEL).value,
@@ -79,6 +80,8 @@ class DeepSeekClient:
             payload["reasoning_effort"] = (
                 reasoning_effort or self.config.REASONING_EFFORT
             )
+        if response_format is not None:
+            payload["response_format"] = response_format
         return payload
 
     def _raise_for_status(self, response: httpx.Response) -> None:
@@ -125,6 +128,7 @@ class DeepSeekClient:
         reasoning_effort: ReasoningEffort | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> ChatResponse:
         if not self.config.is_configured:
             raise AINotConfigured()
@@ -135,6 +139,7 @@ class DeepSeekClient:
             reasoning_effort=reasoning_effort,
             temperature=temperature,
             max_tokens=max_tokens,
+            response_format=response_format,
         )
         try:
             response = await self._get_client().post(

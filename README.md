@@ -14,12 +14,29 @@ retroalimentación sobre gramática, vocabulario y áreas de mejora.
 - **No** certifica nivel MCER, **no** sustituye al docente y **no** evalúa
   pronunciación: el sistema trabaja con la transcripción del audio.
 
-Este repositorio es el **backend**: autenticación, base de datos, cliente de IA y
-sondas de salud. El dominio del simulador (sesiones, retroalimentación y métricas)
-todavía no está implementado. La especificación completa del producto está en la
-skill
+Este repositorio es el **backend**: autenticación, base de datos, cliente de IA,
+sondas de salud y el dominio del simulador (sesiones, turnos, retroalimentación y
+métricas). La especificación completa del producto está en la skill
 [`simulador-conversacional-ia-dev`](./.opencode/skills/simulador-conversacional-ia-dev/SKILL.md)
 y las reglas de código en [`AGENTS.md`](./AGENTS.md).
+
+### Endpoints de la ventana de chat
+
+Todos requieren el token de acceso (`Authorization: Bearer ...`).
+
+| Método y ruta                          | Qué hace                                             |
+| -------------------------------------- | ---------------------------------------------------- |
+| `GET /scenarios`                       | Escenarios y niveles MCER disponibles.               |
+| `POST /sessions`                       | Inicia una sesión y genera el saludo del agente.     |
+| `GET /sessions`                        | Lista las sesiones del estudiante.                   |
+| `GET /sessions/{id}`                   | Carga la conversación (render o reanudar).           |
+| `POST /sessions/{id}/turnos`           | Turno por texto.                                     |
+| `POST /sessions/{id}/turnos/audio`     | Turno por audio (lo transcribe Groq Whisper).        |
+| `POST /sessions/{id}/pausar`           | Pausa la sesión.                                     |
+| `POST /sessions/{id}/reanudar`         | Reanuda (solo dentro de 30 días).                    |
+| `POST /sessions/{id}/cerrar`           | Cierra y genera el reporte de retroalimentación.     |
+| `GET /sessions/{id}/retroalimentacion` | Consulta el reporte ya generado.                     |
+| `POST /sessions/{id}/evaluacion`       | Evaluación opcional del sistema (1 a 5).             |
 
 ## Cómo ejecutarlo
 
@@ -103,8 +120,10 @@ Para generar cada clave, ejecuta este comando y copia el resultado:
 uv run python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-`DEEPSEEK_API_KEY` es opcional: solo se necesita para probar los endpoints de IA.
-Deja las demás líneas como están.
+`DEEPSEEK_API_KEY` es opcional: se necesita para crear sesiones (el agente que
+conversa). `GROQ_API_KEY` es opcional: se necesita para los turnos por audio
+(transcripción). Sin ellas, esos endpoints responden con un error claro y el resto
+de la app funciona. Deja las demás líneas como están.
 
 ### 4. Prepara la base de datos
 

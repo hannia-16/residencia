@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.sessions.repository import RetroalimentacionRepository
 from tests.support import (
+    DEFAULT_REPORT,
     FakeLLM,
     FakeSpeechToText,
     correccion,
@@ -28,6 +29,7 @@ async def test_text_turn_appends_history(authed: AsyncClient) -> None:
     assert turno["estado"] == "activa"
     assert turno["mensaje"]["rol"] == "agente"
     assert turno["mensaje"]["contenido"] == "Sure, coming right up!"
+    assert turno["mensaje"]["finalizada"] is False
     assert "errores" not in turno
 
     detail = await authed.get(f"/sessions/{id_sesion}")
@@ -88,6 +90,43 @@ async def test_turn_invalid_json_retries_then_fails(authed: AsyncClient) -> None
 
     detail = await authed.get(f"/sessions/{id_sesion}")
     assert len(detail.json()["historial"]) == 1
+
+
+async def test_turn_exposes_farewell_flag_and_can_be_closed(
+    authed: AsyncClient,
+) -> None:
+    fake = FakeLLM(
+        turn_ia("Opening"),
+        turn_ia("Goodbye and have a nice day!", finalizada=True),
+        informe_ia(),
+    )
+    _, body = await start_session(authed, fake)
+    id_sesion = body["id_sesion"]
+
+    response = await authed.post(
+        f"/sessions/{id_sesion}/turnos", json={"texto": "That is all, thanks"}
+    )
+
+    assert response.status_code == 200
+    turno = response.json()
+    assert turno["estado"] == "activa"
+    assert turno["mensaje"]["finalizada"] is True
+
+    detail = await authed.get(f"/sessions/{id_sesion}")
+    historial = detail.json()["historial"]
+    assert historial[-1]["rol"] == "agente"
+    assert historial[-1]["finalizada"] is True
+
+    cierre = await authed.post(f"/sessions/{id_sesion}/cerrar")
+    assert cierre.status_code == 200
+    assert cierre.json()["resumen"] == DEFAULT_REPORT
+
+
+async def test_opening_message_is_never_finalized(authed: AsyncClient) -> None:
+    fake = FakeLLM(turn_ia("Opening", finalizada=True))
+    _, body = await start_session(authed, fake)
+
+    assert body["historial"][0]["finalizada"] is False
 
 
 async def test_turn_on_closed_session_conflict(authed: AsyncClient) -> None:

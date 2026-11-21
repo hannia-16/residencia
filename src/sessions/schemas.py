@@ -9,6 +9,7 @@ from src.sessions.constants import (
     MAX_TEXTO_TURNO,
     Escenario,
     EstadoSesion,
+    ModoPractica,
     NivelMCER,
     RolTurno,
     TipoError,
@@ -30,11 +31,13 @@ class TurnoHistorial(CustomModel):
     rol: RolTurno
     contenido: str
     fecha: datetime
+    finalizada: bool = False
 
 
 class SesionCreate(CustomModel):
     escenario: Escenario
     nivel: NivelMCER
+    modo: ModoPractica = ModoPractica.SPEAKING
 
 
 class SesionResumen(CustomModel):
@@ -43,6 +46,7 @@ class SesionResumen(CustomModel):
     id_sesion: uuid.UUID
     escenario: Escenario
     nivel: NivelMCER
+    modo: ModoPractica | None = None
     estado: EstadoSesion
     fecha_inicio: datetime
     fecha_fin: datetime | None = None
@@ -67,6 +71,7 @@ class CorreccionIA(CustomModel):
 class TurnoIA(CustomModel):
     mensaje: str = Field(min_length=1, max_length=MAX_MENSAJE_IA)
     errores: list[CorreccionIA] = Field(default_factory=list)
+    finalizada: bool = False
 
 
 class InformeIA(CustomModel):
@@ -120,6 +125,23 @@ class EvaluacionSistema(CustomModel):
     calificacion: int
     comentario: str | None = None
     fecha: datetime
+
+
+class ErrorGramaticalFrecuente(CustomModel):
+    original: str
+    correccion: str
+    explicacion: str
+    veces: int
+
+
+class MetricasResumen(CustomModel):
+    total_sesiones: int
+    sesiones_concluidas: int
+    sesiones_en_curso: int
+    ultima_practica: datetime | None = None
+    tiempo_total_segundos: int
+    errores_por_tipo: dict[str, int]
+    errores_gramaticales: list[ErrorGramaticalFrecuente]
 
 
 SesionRead.model_rebuild()

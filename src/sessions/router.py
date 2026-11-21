@@ -22,6 +22,7 @@ from src.sessions.schemas import (
     CatalogoRead,
     EvaluacionCreate,
     InformeRead,
+    MetricasResumen,
     SesionCreate,
     SesionListado,
     SesionRead,
@@ -33,6 +34,7 @@ from src.speech.dependencies import SpeechClient
 
 catalog_router = APIRouter(tags=["scenarios"])
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+metrics_router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 AUTHENTICATION_ERRORS = {
     status.HTTP_401_UNAUTHORIZED: {
@@ -73,6 +75,24 @@ AI_ERRORS = {
 )
 async def listar_catalogo(_user: CurrentUser) -> CatalogoRead:
     return sessions_service.catalogo()
+
+
+@metrics_router.get(
+    "",
+    response_model=MetricasResumen,
+    summary="Get the student's practice metrics",
+    description=(
+        "Aggregates the authenticated student's session counts, practice time, "
+        "recurring error types and most frequent grammar corrections."
+    ),
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERRORS[
+            status.HTTP_401_UNAUTHORIZED
+        ]
+    },
+)
+async def obtener_metricas(user: CurrentUser, session: DbSession) -> MetricasResumen:
+    return await sessions_service.resumen_metricas(session, user)
 
 
 @router.post(

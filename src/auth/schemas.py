@@ -19,6 +19,16 @@ class UserLogin(CustomModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class UserEmailUpdate(CustomModel):
+    email: EmailStr
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class UserPasswordUpdate(CustomModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class UserRead(CustomModel):
     model_config = {"from_attributes": True}
 

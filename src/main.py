@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app_kwargs: dict[str, object] = {
-    "title": "cosa-backend",
+    "title": "backend",
     "description": DESCRIPTION,
     "version": __version__,
     "lifespan": lifespan,
@@ -92,4 +92,5 @@ app.include_router(health_router.router)
 app.include_router(auth_router.router)
 app.include_router(ai_router.router)
 app.include_router(sessions_router.catalog_router)
+app.include_router(sessions_router.metrics_router)
 app.include_router(sessions_router.router)

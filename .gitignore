@@ -10,3 +10,7 @@ __pycache__/
 .DS_Store
 dist/
 build/
+respaldo.sql
+.env
+respaldo.sql
+.env

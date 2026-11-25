@@ -1,12 +1,12 @@
 [project]
-name = "cosa-backend"
+name = "residencia"
 version = "0.1.0"
-description = "Un backend para una cosa."
+description = "Un backend para un programa de simulación conversacional."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Kenia Urcid Vazquez", email = "kenia@mail.com" },
-    { name = "Hannia", email = "hannia@mail.com" }
+    { name = "Hannia", email = "mtzahan@gmail.com" }
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -23,6 +23,7 @@ dependencies = [
     "pyjwt>=2.9",
     "pwdlib[argon2]>=0.3",
     "tzdata>=2026.5",
+    "asyncpg>=0.32.0",
 ]
 
 [project.optional-dependencies]

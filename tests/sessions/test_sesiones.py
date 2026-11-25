@@ -42,6 +42,7 @@ async def test_iniciar_sesion_creates_opening_turn(authed: AsyncClient) -> None:
     assert body["estado"] == "activa"
     assert body["escenario"] == "restaurante"
     assert body["nivel"] == "B1"
+    assert body["modo"] == "speaking"
     assert body["fecha_fin"] is None
     assert len(body["historial"]) == 1
     assert body["historial"][0]["rol"] == "agente"
@@ -50,6 +51,18 @@ async def test_iniciar_sesion_creates_opening_turn(authed: AsyncClient) -> None:
     assert sent["response_format"] == {"type": "json_object"}
     assert sent["messages"][0]["role"] == "system"
     assert "restaurante" in sent["messages"][0]["content"]
+
+
+async def test_iniciar_sesion_persiste_el_modo(authed: AsyncClient) -> None:
+    _, body = await start_session(authed, FakeLLM(turn_ia("Opening")), modo="writing")
+
+    assert body["modo"] == "writing"
+
+    listado = await authed.get("/sessions")
+    assert listado.json()[0]["modo"] == "writing"
+
+    detalle = await authed.get(f"/sessions/{body['id_sesion']}")
+    assert detalle.json()["modo"] == "writing"
 
 
 async def test_iniciar_sesion_rejects_unknown_scenario(authed: AsyncClient) -> None:

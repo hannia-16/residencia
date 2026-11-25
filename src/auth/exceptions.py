@@ -17,6 +17,12 @@ class InvalidToken(AuthError):
     message = "The provided token is missing, malformed, or expired."
 
 
+class InvalidPassword(AuthError):
+    status_code = 400
+    code = "invalid_password"
+    message = "The current password is incorrect."
+
+
 class UserAlreadyExists(AuthError):
     status_code = 409
     code = "user_already_exists"

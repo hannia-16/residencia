@@ -1,5 +1,7 @@
 import uuid
 
+from sqlalchemy import select
+
 from src.datasources.base import Repository
 from src.sessions.models import Metrica, Retroalimentacion, Sesion
 
@@ -26,6 +28,19 @@ class RetroalimentacionRepository(Repository[Retroalimentacion]):
 
     async def list_by_sesion(self, id_sesion: uuid.UUID) -> list[Retroalimentacion]:
         return await self.list(filters={"id_sesion": id_sesion})
+
+    async def list_by_user(
+        self, id_usuario: uuid.UUID, *, estado: str | None = None
+    ) -> list[Retroalimentacion]:
+        statement = (
+            select(Retroalimentacion)
+            .join(Sesion, Retroalimentacion.id_sesion == Sesion.id_sesion)
+            .where(Sesion.id_usuario == id_usuario)
+        )
+        if estado is not None:
+            statement = statement.where(Sesion.estado == estado)
+        result = await self.session.execute(statement)
+        return list(result.scalars().unique().all())
 
 
 class MetricaRepository(Repository[Metrica]):

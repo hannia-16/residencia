@@ -14,6 +14,7 @@ from src.sessions.constants import (
     EstadoSesion,
     NivelMCER,
     RolTurno,
+    TipoError,
 )
 from src.sessions.exceptions import (
     EvaluationAlreadySubmitted,
@@ -34,11 +35,13 @@ from src.sessions.repository import (
 from src.sessions.schemas import (
     CatalogoRead,
     CorreccionIA,
+    ErrorGramaticalFrecuente,
     EscenarioRead,
     EvaluacionCreate,
     EvaluacionSistema,
     InformeIA,
     InformeRead,
+    MetricasResumen,
     RetroalimentacionRead,
     SesionCreate,
     SesionListado,
@@ -77,8 +80,13 @@ def _ensure_mutable(sesion: Sesion) -> None:
     _ensure_disponible(sesion)
 
 
-def _turno(rol: RolTurno, contenido: str) -> dict:
-    return {"rol": rol.value, "contenido": contenido, "fecha": _now().isoformat()}
+def _turno(rol: RolTurno, contenido: str, *, finalizada: bool = False) -> dict:
+    return {
+        "rol": rol.value,
+        "contenido": contenido,
+        "fecha": _now().isoformat(),
+        "finalizada": finalizada,
+    }
 
 
 def _mensajes(system: str, historial: list[dict]) -> list[ChatMessage]:
@@ -139,8 +147,9 @@ async def iniciar_sesion(
         id_usuario=user.id,
         escenario=payload.escenario.value,
         nivel=payload.nivel.value,
+        modo=payload.modo.value,
         estado=EstadoSesion.ACTIVA.value,
-        historial=[_turno(RolTurno.AGENTE, turno_ia.mensaje)],
+        historial=[_turno(RolTurno.AGENTE, turno_ia.mensaje, finalizada=False)],
     )
     await session.commit()
     return sesion
@@ -157,6 +166,7 @@ async def listar_sesiones(
             id_sesion=sesion.id_sesion,
             escenario=sesion.escenario,
             nivel=sesion.nivel,
+            modo=sesion.modo,
             estado=sesion.estado,
             fecha_inicio=sesion.fecha_inicio,
             fecha_fin=sesion.fecha_fin,
@@ -164,6 +174,73 @@ async def listar_sesiones(
         )
         for sesion in sesiones
     ]
+
+
+async def resumen_metricas(session: AsyncSession, user: User) -> MetricasResumen:
+    sesiones = await SesionRepository(session).list_by_user(user.id)
+    metricas = await MetricaRepository(session).list_by_user(user.id)
+    en_curso = [
+        sesion for sesion in sesiones if sesion.estado != EstadoSesion.CONCLUIDA.value
+    ]
+
+    ultima_practica = max((sesion.fecha_inicio for sesion in sesiones), default=None)
+    if metricas:
+        ultima_metrica = max(metrica.fecha_inicio for metrica in metricas)
+        if ultima_practica is None or ultima_metrica > ultima_practica:
+            ultima_practica = ultima_metrica
+
+    errores_por_tipo = {tipo.value: 0 for tipo in TipoError}
+    for metrica in metricas:
+        for tipo, cantidad in (metrica.errores or {}).items():
+            if tipo in errores_por_tipo:
+                errores_por_tipo[tipo] += int(cantidad)
+
+    correcciones = await RetroalimentacionRepository(session).list_by_user(
+        user.id, estado=EstadoSesion.CONCLUIDA.value
+    )
+    agrupados: dict[tuple[str, str], dict[str, object]] = {}
+    for correccion in correcciones:
+        datos = correccion.correccion_ia or {}
+        if datos.get("tipo") != TipoError.GRAMATICA.value:
+            continue
+        original = " ".join(str(datos.get("original", "")).split())
+        correccion_texto = " ".join(str(datos.get("correccion", "")).split())
+        if not original or not correccion_texto:
+            continue
+        clave = (original.casefold(), correccion_texto.casefold())
+        existente = agrupados.get(clave)
+        if existente is None:
+            agrupados[clave] = {
+                "original": original,
+                "correccion": correccion_texto,
+                "explicacion": str(datos.get("explicacion", "")),
+                "veces": 1,
+            }
+        else:
+            existente["veces"] = int(existente["veces"]) + 1
+
+    frecuentes = sorted(
+        agrupados.values(),
+        key=lambda item: (-int(item["veces"]), str(item["original"]).casefold()),
+    )[:5]
+
+    return MetricasResumen(
+        total_sesiones=len(metricas) + len(en_curso),
+        sesiones_concluidas=len(metricas),
+        sesiones_en_curso=len(en_curso),
+        ultima_practica=ultima_practica,
+        tiempo_total_segundos=sum(metrica.duracion for metrica in metricas),
+        errores_por_tipo=errores_por_tipo,
+        errores_gramaticales=[
+            ErrorGramaticalFrecuente(
+                original=str(item["original"]),
+                correccion=str(item["correccion"]),
+                explicacion=str(item["explicacion"]),
+                veces=int(item["veces"]),
+            )
+            for item in frecuentes
+        ],
+    )
 
 
 async def obtener_sesion(sesion: Sesion) -> Sesion:
@@ -185,7 +262,9 @@ async def registrar_turno(
     mensajes.append(ChatMessage(role=MessageRole.USER, content=texto))
     turno_ia = await complete_structured(ai, mensajes, TurnoIA)
     turno_estudiante = _turno(RolTurno.ESTUDIANTE, texto)
-    turno_agente = _turno(RolTurno.AGENTE, turno_ia.mensaje)
+    turno_agente = _turno(
+        RolTurno.AGENTE, turno_ia.mensaje, finalizada=turno_ia.finalizada
+    )
     sesion.historial = [*sesion.historial, turno_estudiante, turno_agente]
     await _persistir_correcciones(session, sesion, texto, turno_ia)
     await session.commit()

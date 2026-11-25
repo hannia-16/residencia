@@ -175,3 +175,142 @@ async def test_logout_clears_cookie(client: AsyncClient) -> None:
     assert 'refresh_token=""' in response.headers.get("set-cookie", "") or (
         "refresh_token=;" in response.headers.get("set-cookie", "")
     )
+
+
+async def test_update_email_requires_current_password(client: AsyncClient) -> None:
+    body = await register(client)
+
+    response = await client.patch(
+        "/auth/me",
+        json={
+            "email": "nueva@example.com",
+            "current_password": "wrong-password",
+        },
+        headers=auth_headers(body["access_token"]),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "invalid_password"
+
+
+async def test_update_email_changes_login_identifier(client: AsyncClient) -> None:
+    body = await register(client)
+    headers = auth_headers(body["access_token"])
+
+    response = await client.patch(
+        "/auth/me",
+        json={
+            "email": "nueva@example.com",
+            "current_password": VALID_SIGNUP["password"],
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "nueva@example.com"
+
+    nuevo_login = await client.post(
+        "/auth/login",
+        json={
+            "email": "nueva@example.com",
+            "password": VALID_SIGNUP["password"],
+        },
+    )
+    assert nuevo_login.status_code == 200
+
+    viejo_login = await client.post(
+        "/auth/login",
+        json={
+            "email": VALID_SIGNUP["email"],
+            "password": VALID_SIGNUP["password"],
+        },
+    )
+    assert viejo_login.status_code == 401
+
+
+async def test_update_email_rejects_duplicate(client: AsyncClient) -> None:
+    first = await register(client)
+    second_signup = unique_signup("otro")
+    second = await client.post("/auth/signup", json=second_signup)
+    assert second.status_code == 201
+
+    response = await client.patch(
+        "/auth/me",
+        json={
+            "email": second_signup["email"],
+            "current_password": VALID_SIGNUP["password"],
+        },
+        headers=auth_headers(first["access_token"]),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "user_already_exists"
+
+
+async def test_update_password_requires_current_password(
+    client: AsyncClient,
+) -> None:
+    body = await register(client)
+
+    response = await client.post(
+        "/auth/me/password",
+        json={
+            "current_password": "wrong-password",
+            "new_password": "new-correct-horse",
+        },
+        headers=auth_headers(body["access_token"]),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "invalid_password"
+
+
+async def test_update_password_changes_login_password(
+    client: AsyncClient,
+) -> None:
+    body = await register(client)
+
+    response = await client.post(
+        "/auth/me/password",
+        json={
+            "current_password": VALID_SIGNUP["password"],
+            "new_password": "new-correct-horse",
+        },
+        headers=auth_headers(body["access_token"]),
+    )
+    assert response.status_code == 204
+
+    nuevo_login = await client.post(
+        "/auth/login",
+        json={
+            "email": VALID_SIGNUP["email"],
+            "password": "new-correct-horse",
+        },
+    )
+    assert nuevo_login.status_code == 200
+
+    viejo_login = await client.post(
+        "/auth/login",
+        json={
+            "email": VALID_SIGNUP["email"],
+            "password": VALID_SIGNUP["password"],
+        },
+    )
+    assert viejo_login.status_code == 401
+
+
+async def test_update_password_rejects_short_password(
+    client: AsyncClient,
+) -> None:
+    body = await register(client)
+
+    response = await client.post(
+        "/auth/me/password",
+        json={
+            "current_password": VALID_SIGNUP["password"],
+            "new_password": "short",
+        },
+        headers=auth_headers(body["access_token"]),
+    )
+
+    assert response.status_code == 422

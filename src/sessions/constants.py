@@ -25,6 +25,11 @@ class EstadoSesion(StrEnum):
     CONCLUIDA = "concluida"
 
 
+class ModoPractica(StrEnum):
+    SPEAKING = "speaking"
+    WRITING = "writing"
+
+
 class RolTurno(StrEnum):
     AGENTE = "agente"
     ESTUDIANTE = "estudiante"

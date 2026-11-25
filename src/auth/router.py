@@ -6,7 +6,14 @@ from src.auth import service as auth_service
 from src.auth.config import auth_settings
 from src.auth.dependencies import CurrentUser
 from src.auth.exceptions import InvalidToken
-from src.auth.schemas import TokenPair, UserCreate, UserLogin, UserRead
+from src.auth.schemas import (
+    TokenPair,
+    UserCreate,
+    UserEmailUpdate,
+    UserLogin,
+    UserPasswordUpdate,
+    UserRead,
+)
 from src.datasources.dependencies import DbSession
 from src.exceptions import ErrorResponse
 
@@ -117,3 +124,41 @@ async def logout(response: Response) -> None:
 )
 async def read_me(user: CurrentUser) -> UserRead:
     return UserRead.model_validate(user)
+
+
+@router.patch(
+    "/me",
+    response_model=UserRead,
+    summary="Update the authenticated user's email",
+    description="Requires the current password to confirm the change.",
+    responses={
+        **ERROR_RESPONSES,
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Current password is incorrect",
+        },
+    },
+)
+async def update_me(
+    payload: UserEmailUpdate, user: CurrentUser, session: DbSession
+) -> UserRead:
+    actualizado = await auth_service.update_email(session, user, payload)
+    return UserRead.model_validate(actualizado)
+
+
+@router.post(
+    "/me/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change the authenticated user's password",
+    responses={
+        **ERROR_RESPONSES,
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Current password is incorrect",
+        },
+    },
+)
+async def update_my_password(
+    payload: UserPasswordUpdate, user: CurrentUser, session: DbSession
+) -> None:
+    await auth_service.update_password(session, user, payload)

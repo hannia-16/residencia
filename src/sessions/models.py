@@ -17,6 +17,7 @@ class Sesion(Base):
     )
     escenario: Mapped[str] = mapped_column(String(64))
     nivel: Mapped[str] = mapped_column(String(8))
+    modo: Mapped[str | None] = mapped_column(String(16), nullable=True)
     estado: Mapped[str] = mapped_column(
         String(16),
         default=EstadoSesion.ACTIVA.value,

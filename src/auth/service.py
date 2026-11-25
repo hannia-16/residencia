@@ -7,13 +7,21 @@ from src.auth.config import auth_settings
 from src.auth.constants import TokenType
 from src.auth.exceptions import (
     InvalidCredentials,
+    InvalidPassword,
     UserAlreadyExists,
     UserNotActive,
     UserNotFound,
 )
 from src.auth.models import User
 from src.auth.repository import UserRepository
-from src.auth.schemas import TokenPair, UserCreate, UserLogin, UserRead
+from src.auth.schemas import (
+    TokenPair,
+    UserCreate,
+    UserEmailUpdate,
+    UserLogin,
+    UserPasswordUpdate,
+    UserRead,
+)
 from src.auth.security import (
     create_access_token,
     create_refresh_token,
@@ -79,3 +87,32 @@ async def refresh_token_pair(session: AsyncSession, token: str) -> TokenPair:
 
 async def get_current_user(session: AsyncSession, user_id: uuid.UUID) -> User:
     return await _get_active_user(session, user_id)
+
+
+async def update_email(
+    session: AsyncSession, user: User, data: UserEmailUpdate
+) -> User:
+    if not verify_password(data.current_password, user.hashed_password):
+        raise InvalidPassword()
+    email = str(data.email)
+    if email != user.email:
+        existing = await UserRepository(session).get_by_email(email)
+        if existing is not None and existing.id != user.id:
+            raise UserAlreadyExists()
+        user.email = email
+        try:
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise UserAlreadyExists() from exc
+        await session.refresh(user)
+    return user
+
+
+async def update_password(
+    session: AsyncSession, user: User, data: UserPasswordUpdate
+) -> None:
+    if not verify_password(data.current_password, user.hashed_password):
+        raise InvalidPassword()
+    user.hashed_password = hash_password(data.new_password)
+    await session.commit()

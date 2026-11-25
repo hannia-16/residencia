@@ -29,8 +29,19 @@ def chat_body(content: str) -> dict[str, Any]:
     }
 
 
-def turn_ia(mensaje: str = DEFAULT_TURN, errores: list[dict] | None = None) -> str:
-    return json.dumps({"mensaje": mensaje, "errores": errores or []})
+def turn_ia(
+    mensaje: str = DEFAULT_TURN,
+    errores: list[dict] | None = None,
+    *,
+    finalizada: bool = False,
+) -> str:
+    return json.dumps(
+        {
+            "mensaje": mensaje,
+            "errores": errores or [],
+            "finalizada": finalizada,
+        }
+    )
 
 
 def correccion(
@@ -103,11 +114,13 @@ async def start_session(
     *,
     escenario: str = "restaurante",
     nivel: str = "B1",
+    modo: str | None = None,
 ) -> tuple[FakeLLM, dict]:
     resolved = fake or FakeLLM(turn_ia())
     use_llm(resolved)
-    response = await client.post(
-        "/sessions", json={"escenario": escenario, "nivel": nivel}
-    )
+    payload = {"escenario": escenario, "nivel": nivel}
+    if modo is not None:
+        payload["modo"] = modo
+    response = await client.post("/sessions", json=payload)
     assert response.status_code == 201, response.text
     return resolved, response.json()
